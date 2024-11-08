@@ -1,0 +1,1 @@
+-IC:/Users/tramb/CLionProjects/KMeans/matplotplusplus/source -I"C:/Users/tramb/CLionProjects/KMeans/cmake-build-debug/matplotplusplus/source/matplot" -isystem C:/Users/tramb/CLionProjects/KMeans/matplotplusplus/source/3rd_party/cimg -isystem C:/Users/tramb/CLionProjects/KMeans/matplotplusplus/source/3rd_party/nodesoup/include
