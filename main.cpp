@@ -7,7 +7,6 @@
 #include <omp.h>
 #include <fstream>
 #include <sstream>
-#include <matplot/matplot.h>
 
 struct Point {
     double x, y;
@@ -198,7 +197,7 @@ void draw_chart_gnu(std::vector<Point> &points){
     }
 
     outfile.close();
-    system("gnuplot -p -e \"plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"");
+    system("gnuplot -p -e \"set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"");
     remove("data.txt");
 
 }
