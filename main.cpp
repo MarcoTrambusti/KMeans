@@ -7,7 +7,6 @@
 #include <omp.h>
 #include <fstream>
 #include <sstream>
-#include <matplot/matplot.h>
 
 struct Point {
     double x, y;
