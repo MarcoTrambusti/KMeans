@@ -6,7 +6,14 @@
 #include <ctime>
 #include <omp.h>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
+#include <filesystem>
+
+double max_range = 100000;
+int num_point = 50000;
+int num_cluster = 20;
+int max_iterations = 20;
 
 struct Point {
     double x, y;
@@ -100,7 +107,7 @@ void parallel_kmeans(std::vector<Point>& points, int k, int epochs, double toler
             std::vector<int> local_nPoints(k, 0);
             std::vector<double> local_sumX(k, 0.0), local_sumY(k, 0.0);
 
-            #pragma omp for
+            #pragma omp for nowait
             for (size_t j = 0; j < points.size(); ++j) {
                 auto& point = points[j];
                 double minDist = std::numeric_limits<double>::max();
@@ -136,6 +143,7 @@ void parallel_kmeans(std::vector<Point>& points, int k, int epochs, double toler
         // Update centroids
         bool converged = true;
 
+        #pragma omp parallel for reduction(&:converged)
         for (int i = 0; i < k; ++i) {
             if (nPoints[i] > 0) {
                 double newX = sumX[i] / nPoints[i];
@@ -161,7 +169,7 @@ std::vector<Point> readCSV() {
     std::cout << "Reading CSV file..." << std::endl;
     std::vector<Point> points;
     std::string line;
-    std::ifstream file("resources/income_score.csv");
+    std::ifstream file("resources/age_satisfaction.csv");
     std::cout << (file.is_open() ? "File Opened" : "Could not open the file!") << std::endl;
     // Skip the header line
     std::getline(file, line);
@@ -185,7 +193,7 @@ std::vector<Point> readCSV() {
     return points;
 }
 
-void draw_chart_gnu(std::vector<Point> &points){
+/**void draw_chart_gnu(std::vector<Point> &points){
 
     std::ofstream outfile("data.txt");
 
@@ -200,49 +208,116 @@ void draw_chart_gnu(std::vector<Point> &points){
     system("gnuplot -p -e \"set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"");
     remove("data.txt");
 
+}**/
+
+void draw_chart_gnu(std::vector<Point> &points, const std::string& filename) {
+    std::ofstream outfile("data.txt");
+    std::filesystem::create_directory("plots");
+
+    for (int i = 0; i < points.size(); i++) {
+        Point point = points[i];
+        outfile << point.x << " " << point.y << " " << point.cluster << std::endl;
+    }
+
+    outfile.close();
+
+    std::string gnuplot_command = "gnuplot -e \"set terminal png size 800,600; set output 'plots/" + filename + "'; set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; set cbrange [0:20]; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"";
+    system(gnuplot_command.c_str());
+
+    remove("data.txt");
+}
+
+
+std::vector<Point> init_point(int num_point){
+
+    std::vector<Point> points(num_point);
+    Point *ptr = &points[0];
+
+    for(int i = 0; i < num_point; i++){
+
+        Point* point = new Point(rand() % (int)max_range, rand() % (int)max_range);
+
+        ptr[i] = *point;
+
+    }
+
+    return points;
+
+}
+
+// Function to log the performance results of the rendering
+void logExecutionDetails(const std::string& filename, const std::vector<std::tuple<int, int, double, double, double>>& results) {
+    std::ofstream out(filename);
+    out << "points | Threads | Duration (s) | Speedup | Efficiency\n";
+    out << "-----------------------------------------------------------\n";
+    for (const auto& result : results) {
+        out << std::setw(7) << std::get<0>(result) << " | "
+            << std::setw(7) << std::get<1>(result) << " | "
+            << std::setw(18) << std::fixed << std::setprecision(4) << std::get<2>(result) << " | "
+            << std::setw(7) << std::fixed << std::setprecision(2) << std::get<3>(result) << " | "
+            << std::setw(9) << std::fixed << std::setprecision(2) << std::get<4>(result) << "\n";
+    }
+    out.close();
 }
 
 int main() {
-    /*std::vector<Point> points = {
-        {1.0, 2.0}, {2.0, 3.0}, {3.0, 3.0}, {6.0, 8.0}, {7.0, 9.0}, {8.0, 8.0}
-    };*/
-    std::vector<Point> points = readCSV();
-    draw_chart_gnu(points);
-    /*std::vector<double> x, y;
-    for (const auto& point : points) {
-        x.push_back(point.x);
-        y.push_back(point.y);
-    }
-    matplot::scatter(x,y)->marker_face(true);
-    matplot::xlabel("Annual Income");
-    matplot::ylabel("Spending Score (1-100)");
-    matplot::title("Customer Segmentation");
-    matplot::show();*/
+    std::vector<int> numThreadsList = {1,2,3, 4,5,6,7,8,9,10,11,12,13,14,15,16};
+    std::vector<int> numPointsList = {500, 1000, 2000, 3000}; // Lista dei numeri di punti
+    std::vector<std::tuple<int, int, double, double, double>> results;
 
-    int k = 5;
+    int k = 20;
     int epochs = 10000;
     double tolerance = 0.00000000001;
-    double runtime = omp_get_wtime();
-    kmeans(points, k, epochs, tolerance);
-    //parallel_kmeans(points, k, epochs, tolerance);
-    runtime = omp_get_wtime() - runtime;
-    for (const auto& point : points) {
-        std::cout << "Point (" << point.x << ", " << point.y << ") is in cluster " << point.cluster << std::endl;
-    }
-    printf("\n runtime: %f  \n", runtime);
-    draw_chart_gnu(points);
 
-    // Plot points with different colors based on cluster
-    /*x.clear();
-    /y.clear();
-    std::vector<int> colors;
-    for (const auto& point : points) {
-        x.push_back(point.x);
-        y.push_back(point.y);
-        colors.push_back(point.cluster);
+    // Leggi i punti dal file CSV una sola volta
+    std::vector<Point> points = readCSV();
+    numPointsList.push_back(points.size());
+
+    for (int numPoints : numPointsList) {
+        // Misura il tempo per kmeans (sequenziale)
+        double totalDurationSequential = 0.0;
+        int numMeasurements = 5; // Numero di misurazioni per calcolare la durata media
+        double avgDurationSequential = 0.0;
+
+        for (int numThreads : numThreadsList) {
+            omp_set_num_threads(numThreads);
+
+            double totalDuration = 0.0;
+
+            for (int measurement = 0; measurement < numMeasurements; ++measurement) {
+                // Riduci il numero di punti in pointsCopy
+                std::vector<Point> pointsCopy(points.begin(), points.begin() + numPoints);
+                if(measurement == 0) {
+                    draw_chart_gnu(pointsCopy, "initial_points_number_" + std::to_string(numPoints)+ ".png");
+                }
+                double startParallel = omp_get_wtime();
+                if(numThreads== 1) {
+                    kmeans(pointsCopy, k, epochs, tolerance);
+                } else {
+                    parallel_kmeans(pointsCopy, k, epochs, tolerance);
+                }
+                double endParallel = omp_get_wtime();
+                totalDuration += (endParallel - startParallel);
+                draw_chart_gnu(pointsCopy, "kmeans_numThreads_" + std::to_string(numThreads)+"_numPoints_"+ std::to_string(numPoints) + "_measurament_n_" + std::to_string(measurement) +".png");
+            }
+
+            if(numThreads==1) {
+                avgDurationSequential = totalDuration / numMeasurements;
+            }
+
+            double avgDurationParallel = totalDuration / numMeasurements;
+            double speedup = avgDurationSequential / avgDurationParallel;
+            double efficiency = speedup / numThreads;
+
+            std::cout << "Points: " << numPoints << ", Threads: " << numThreads
+                      << ", Avg Duration (Parallel): " << avgDurationParallel << "s, Speedup: " << speedup
+                      << ", Efficiency: " << efficiency << std::endl;
+
+            results.push_back({numPoints, numThreads, avgDurationParallel, speedup, efficiency});
+        }
     }
-    matplot::scatter(x, y, std::vector<double>{}, colors)->marker_face(true);
-    matplot::show();*/
+
+    logExecutionDetails("performance_log.txt", results);
 
     return 0;
 }
