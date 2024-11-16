@@ -10,11 +10,8 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
+#include <unordered_map>
 
-double max_range = 100000;
-int num_point = 50000;
-int num_cluster = 20;
-int max_iterations = 20;
 
 struct Point {
     double x, y;
@@ -27,63 +24,6 @@ struct Point {
         return (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
     }
 };
-
-/*double euclideanDistance(const Point& p1, const Point& p2) {
-    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
-}*/
-
-void kmeans(std::vector<Point>& points,std::vector<Point> centroids, int k, int epochs, double tolerance) {
-   /* std::vector<Point> centroids;
-    std::srand(std::time(0));
-
-    // Initialize centroids randomly
-    for (int i = 0; i < k; ++i) {
-        centroids.push_back(points[std::rand() % points.size()]);
-    }*/
-
-    for (int epoch = 0; epoch < epochs; ++epoch) {
-        bool converged = true;
-        std::vector<int> nPoints(k, 0);
-        std::vector<double> sumX(k, 0.0), sumY(k, 0.0);
-
-        // Assign points to the nearest centroid
-        for (auto& point : points) {
-            for (int i = 0; i < k; ++i) {
-                double dist = point.distance(centroids[i]);
-                if (dist < point.minDist) {
-                    point.minDist = dist;
-                    point.cluster = i;
-                }
-            }
-
-            //append data to centroids
-            int clusterId = point.cluster;
-            nPoints[clusterId] += 1;
-            sumX[clusterId] += point.x;
-            sumY[clusterId] += point.y;
-
-            point.minDist = std::numeric_limits<double>::max();  // reset distance
-        }
-
-        // Compute the new centroids
-        for (int i = 0; i < k; ++i) {
-            if (nPoints[i] != 0) { // Check to avoid division by zero
-                double newX = sumX[i] / nPoints[i];
-                double newY = sumY[i] / nPoints[i];
-                if (std::abs(newX - centroids[i].x) > tolerance || std::abs(newY - centroids[i].y) > tolerance) {
-                    converged = false;
-                }
-                centroids[i].x = newX;
-                centroids[i].y = newY;
-            }
-        }
-
-        if (converged) {
-            std::cout << "Converged after " << epoch + 1 << " epochs." << std::endl;
-            break;
-        }
-    }
-}
 
 void parallel_kmeans(std::vector<Point>& points, std::vector<Point> centroids, int k, int epochs, double tolerance) {
     for (int epoch = 0; epoch < epochs; ++epoch) {
@@ -132,42 +72,12 @@ void parallel_kmeans(std::vector<Point>& points, std::vector<Point> centroids, i
     }
 }
 
-/*std::vector<Point> readCSV() {
-    std::cout << "Reading CSV file..." << std::endl;
-    std::vector<Point> points;
-    std::string line;
-    std::ifstream file("resources/a.csv");
-    std::cout << (file.is_open() ? "File Opened" : "Could not open the file!") << std::endl;
-    // Skip the header line
-    std::getline(file, line);
-
-    while (std::getline(file, line)) {
-        std::stringstream lineStream(line);
-        std::string bit;
-        double x, y;
-
-        // Read the first value (x)
-        std::getline(lineStream, bit, ',');
-        x = std::stod(bit);
-
-        // Read the second value (y)
-        std::getline(lineStream, bit, ',');
-        y = std::stof(bit);
-
-        points.emplace_back(x, y);
-    }
-
-    return points;
-}
-*/
-
 void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,double minX, double minY, double maxX, double maxY) {
     std::ofstream outfile("data.txt");
     std::filesystem::create_directory("plots");
 
     for (int i = 0; i < points.size(); i++) {
         Point point = points[i];
-        //outfile << (point.x) << " " << (point.y) << " " << point.cluster << std::endl;
         outfile << (point.x + minX)*(maxX - minX) << " " << (point.y+minY)*(maxY - minY) << " " << point.cluster << std::endl;
     }
 
@@ -178,24 +88,6 @@ void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,doub
 
     remove("data.txt");
 }
-
-
-/*std::vector<Point> init_point(int num_point){
-
-    std::vector<Point> points(num_point);
-    Point *ptr = &points[0];
-
-    for(int i = 0; i < num_point; i++){
-
-        Point* point = new Point(rand() % (int)max_range, rand() % (int)max_range);
-
-        ptr[i] = *point;
-
-    }
-
-    return points;
-
-}*/
 
 // Function to log the performance results of the rendering
 void logExecutionDetails(const std::string& filename, const std::vector<std::tuple<int, int, double, double, double>>& results) {
@@ -264,26 +156,26 @@ int main() {
     std::vector<int> numThreadsList = {1,2,3, 4,5,6,7,8,9,10,11,12,13,14,15,16};
     std::vector<int> numPointsList = {500, 7000, 20000, 50000, 126000}; // Lista dei numeri di punti
     std::vector<std::tuple<int, int, double, double, double>> results;
+    std::unordered_map<int, int> pointsToClusters = { {500, 5}, {7000, 10}, {20000, 20}, {50000, 50}, {126000, 100}, {301487, 200} };
 
-    int k = 20;
+    //int k = 20;
     int epochs = 10000;
     double tolerance = 1e-3;
 
     // Leggi i punti dal file CSV una sola volta
     double minX, minY, maxX, maxY;
     std::vector<Point> points = readAndNormalizeCSV("resources/a.csv", minX, minY, maxX, maxY);
-    //std::vector<Point> points = init_point(126000);
-    //std::vector<Point> points = readCSV();
     numPointsList.push_back(points.size());
 
     for (int numPoints : numPointsList) {
-        //std::vector<Point> points = init_point(numPoints);
+        int numClusters = pointsToClusters[numPoints];
+        std::cout << "Number of points: " << numPoints << " -> Number of clusters: " << numClusters << std::endl;
         // Misura il tempo per kmeans (sequenziale)
         double totalDurationSequential = 0.0;
-        int numMeasurements = 5; // Numero di misurazioni per calcolare la durata media
+        int numMeasurements = 1; // Numero di misurazioni per calcolare la durata media
         double avgDurationSequential = 0.0;
         std::vector<Point> centroids;
-        init_centroids(k, points, centroids);
+        init_centroids(numClusters, points, centroids);
 
         for (int numThreads : numThreadsList) {
             omp_set_num_threads(numThreads);
@@ -297,7 +189,7 @@ int main() {
                 }
                 double startParallel = omp_get_wtime();
 
-                parallel_kmeans(pointsCopy, centroids,k, epochs, tolerance);
+                parallel_kmeans(pointsCopy, centroids,numClusters, epochs, tolerance);
                 double endParallel = omp_get_wtime();
                 totalDuration += (endParallel - startParallel);
 
