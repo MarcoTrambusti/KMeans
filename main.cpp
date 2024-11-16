@@ -52,27 +52,27 @@ void parallel_kmeans(std::vector<Point>& points, std::vector<Point> centroids, i
             }
 
             // Update centroids
-            #pragma omp for reduction(&:converged)
+            #pragma omp for //reduction(&:converged)
             for (int i = 0; i < k; ++i) {
                 if (nPoints[i] > 0) {
                     double newX = sumX[i] / nPoints[i];
                     double newY = sumY[i] / nPoints[i];
-                    if (std::abs(newX - centroids[i].x) > tolerance || std::abs(newY - centroids[i].y) > tolerance) {
+                    /*if (std::abs(newX - centroids[i].x) > tolerance || std::abs(newY - centroids[i].y) > tolerance) {
                         converged = false;
-                    }
+                    }*/
                     centroids[i].x = newX;
                     centroids[i].y = newY;
                 }
             }
         }
 
-        if (converged) {
+        /*if (converged) {
             break;
-        }
+        }*/
     }
 }
 
-void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,double minX, double minY, double maxX, double maxY) {
+void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,double minX, double minY, double maxX, double maxY, int numClusters) {
     std::ofstream outfile("data.txt");
     std::filesystem::create_directory("plots");
 
@@ -83,7 +83,7 @@ void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,doub
 
     outfile.close();
 
-    std::string gnuplot_command = "gnuplot -e \"set terminal png size 800,600; set output 'plots/" + filename + "'; set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; set cbrange [0:20]; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"";
+    std::string gnuplot_command = "gnuplot -e \"set terminal png size 800,600; set output 'plots/" + filename + "'; set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; set cbrange [0:"+std::to_string(numClusters)+"]; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"";
     system(gnuplot_command.c_str());
 
     remove("data.txt");
@@ -104,7 +104,7 @@ void logExecutionDetails(const std::string& filename, const std::vector<std::tup
 }
 
 void init_centroids(int k, std::vector<Point> points, std::vector<Point> &centroids) {
-    std::srand(std::time(0));
+    std::srand(std::time(nullptr));
 
     // Initialize centroids randomly
     for (int i = 0; i < k; ++i) {
@@ -153,13 +153,14 @@ std::vector<Point> readAndNormalizeCSV(const std::string& filename,double& minX,
 }
 
 int main() {
-    std::vector<int> numThreadsList = {1,2,3, 4,5,6,7,8,9,10,11,12,13,14,15,16};
+    std::vector<int> numThreadsList = {1,2,4,6,8,10,12,14,16};
     std::vector<int> numPointsList = {500, 7000, 20000, 50000, 126000}; // Lista dei numeri di punti
     std::vector<std::tuple<int, int, double, double, double>> results;
-    std::unordered_map<int, int> pointsToClusters = { {500, 5}, {7000, 10}, {20000, 20}, {50000, 50}, {126000, 100}, {301487, 200} };
+    std::unordered_map<int, int> pointsToClusters = { {500, 5}, {7000, 15}, {20000, 20}, {50000, 25}, {126000, 30}, {301487, 40} };
+    std::unordered_map<int, int> pointsToEpochs = { {500, 20}, {7000, 50}, {20000, 70}, {50000, 100}, {126000, 120}, {301487, 200} };
 
     //int k = 20;
-    int epochs = 10000;
+    int epochs = 100;
     double tolerance = 1e-3;
 
     // Leggi i punti dal file CSV una sola volta
@@ -172,20 +173,22 @@ int main() {
         std::cout << "Number of points: " << numPoints << " -> Number of clusters: " << numClusters << std::endl;
         // Misura il tempo per kmeans (sequenziale)
         double totalDurationSequential = 0.0;
-        int numMeasurements = 1; // Numero di misurazioni per calcolare la durata media
+        int numMeasurements = 5; // Numero di misurazioni per calcolare la durata media
         double avgDurationSequential = 0.0;
         std::vector<Point> centroids;
-        init_centroids(numClusters, points, centroids);
+        //init_centroids(numClusters, points, centroids);
 
         for (int numThreads : numThreadsList) {
             omp_set_num_threads(numThreads);
             double totalDuration = 0.0;
 
             for (int measurement = 0; measurement < numMeasurements; ++measurement) {
+                centroids.clear();
+                init_centroids(numClusters, points, centroids);
                 // Riduci il numero di punti in pointsCopy
                 std::vector<Point> pointsCopy(points.begin(), points.begin() + numPoints);
                 if(measurement == 0) {
-                    draw_chart_gnu(pointsCopy, "initial_points_number_" + std::to_string(numPoints)+ ".png",minX, minY, maxX, maxY);
+                    draw_chart_gnu(pointsCopy, "initial_points_number_" + std::to_string(numPoints)+ ".png",minX, minY, maxX, maxY, numClusters);
                 }
                 double startParallel = omp_get_wtime();
 
@@ -194,7 +197,7 @@ int main() {
                 totalDuration += (endParallel - startParallel);
 
                 if(measurement == 0) {
-                    draw_chart_gnu(pointsCopy, "kmeans_numThreads_" + std::to_string(numThreads)+"_numPoints_"+ std::to_string(numPoints) + "_measurament_n_" + std::to_string(measurement) +".png", minX, minY, maxX, maxY);
+                    draw_chart_gnu(pointsCopy, "kmeans_numThreads_" + std::to_string(numThreads)+"_numPoints_"+ std::to_string(numPoints) + "_measurament_n_" + std::to_string(measurement) +".png", minX, minY, maxX, maxY, numClusters);
                 }
             }
 
