@@ -80,11 +80,11 @@ void draw_chart_gnu(std::vector<Point> &points, const std::string& filename,doub
     std::filesystem::create_directory("plots");
 
     for (auto point : points) {
-        outfile << (point.x + minX)*(maxX - minX) << " " << (point.y+minY)*(maxY - minY) << " " << point.cluster << std::endl;
+        outfile << point.x *(maxX - minX) + minX<< " " << point.y *(maxY - minY)+minY << " " << point.cluster << std::endl;
     }
 
     outfile.close();
-    std::string gnuplot_command = "gnuplot -e \"set terminal png size 800,600; set output 'plots/" + filename + "'; set xlabel 'Annual Income (k$)'; set ylabel 'Spending Score (1-100)'; set palette rgbformulae 22,13,-31; set cbrange [0:"+std::to_string(numClusters)+"]; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"";
+    std::string gnuplot_command = "gnuplot -e \"set terminal png size 800,600; set output 'plots/" + filename + "'; set xlabel 'Age'; set ylabel 'Total amount spent'; set palette rgbformulae 22,13,-31; set cbrange [0:"+std::to_string(numClusters)+"]; plot 'data.txt' using 1:2:3 with points pt 7 palette notitle\"";
     system(gnuplot_command.c_str());
     remove("data.txt");
 }
@@ -138,7 +138,7 @@ std::vector<Point> readAndNormalizeCSV(const std::string& filename,double& minX,
 }
 
 int main() {
-    std::vector<int> numThreadsList = {1,2,4,6,8,10,12,14,16};
+    std::vector<int> numThreadsList = {1,2,4,6,8,16};
     std::vector<int> numPointsList = {500, 7000, 20000, 50000, 126000}; // Lista dei numeri di punti
     std::vector<std::tuple<int, int, double, double, double>> results;
     std::unordered_map<int, int> pointsToClusters = { {500, 5}, {7000, 10}, {20000, 12}, {50000, 15}, {126000, 18}, {301487, 20} };
