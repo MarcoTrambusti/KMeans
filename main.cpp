@@ -41,9 +41,9 @@ void kmeans(std::vector<Point>& points, std::vector<Point> centroids, int k, int
         double sumX[k] = {0.0};
         double sumY[k] = {0.0};
 
-        // Assign points to the nearest centroid
         #pragma omp parallel default(none) shared(points, centroids, nPoints, sumX, sumY,k) if(omp_get_max_threads() > 1)
         {
+            // Assign points to the nearest centroid
             #pragma omp for reduction(+:nPoints,sumX,sumY)
             for (auto& point : points) {
                 for (int i = 0; i < k; ++i) {
