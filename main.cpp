@@ -35,7 +35,7 @@ void init_centroids(int k, const std::vector<Point>& points, std::vector<Point>&
     }
 }
 
-void parallel_kmeans(std::vector<Point>& points, std::vector<Point> centroids, int k, int epochs) {
+void kmeans(std::vector<Point>& points, std::vector<Point> centroids, int k, int epochs) {
     for (int epoch = 0; epoch < epochs; ++epoch) {
         int nPoints[k]= {0};
         double sumX[k] = {0.0};
@@ -138,7 +138,7 @@ std::vector<Point> readAndNormalizeCSV(const std::string& filename,double& minX,
 }
 
 int main() {
-    std::vector<int> numThreadsList = {1,2,4,6,8,16};
+    std::vector<int> numThreadsList = {1,2,4,8,16};
     std::vector<int> numPointsList = {500, 7000, 20000, 50000, 126000}; // Lista dei numeri di punti
     std::vector<std::tuple<int, int, double, double, double>> results;
     std::unordered_map<int, int> pointsToClusters = { {500, 5}, {7000, 10}, {20000, 12}, {50000, 15}, {126000, 18}, {301487, 20} };
@@ -168,8 +168,7 @@ int main() {
                     draw_chart_gnu(pointsCopy, "initial_points_number_" + std::to_string(numPoints)+ ".png",minX, minY, maxX, maxY, numClusters);
                 }
                 double startParallel = omp_get_wtime();
-
-                parallel_kmeans(pointsCopy, centroids,numClusters, pointsToEpochs[numPoints]);
+                kmeans(pointsCopy, centroids,numClusters, pointsToEpochs[numPoints]);
                 double endParallel = omp_get_wtime();
                 totalDuration += (endParallel - startParallel);
 
